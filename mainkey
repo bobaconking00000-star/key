@@ -1,0 +1,507 @@
+-- ==========================================
+-- 🔑 KEY SYSTEM + AUTO LOAD SCRIPT
+-- Delta Executor
+-- ==========================================
+
+local TweenService = game:GetService("TweenService")
+
+-- ===== CẤU HÌNH =====
+local FILE_NAME = "saved_keys.txt"
+local KEY_URL = "https://raw.githubusercontent.com/bobaconking00000-star/key/refs/heads/main/hlodwhite"
+local SCRIPT_URL = "https://raw.githubusercontent.com/tienkhanh1/spicy/main/Chilli.lua"
+
+-- ===== MÀU SẮC =====
+local COLORS = {
+    Background    = Color3.fromRGB(18, 18, 28),
+    Panel         = Color3.fromRGB(28, 28, 42),
+    PanelLight    = Color3.fromRGB(38, 38, 56),
+    Border        = Color3.fromRGB(60, 60, 90),
+    TextPrimary   = Color3.fromRGB(240, 240, 255),
+    TextSecondary = Color3.fromRGB(150, 150, 180),
+    Green         = Color3.fromRGB(46, 204, 113),
+    Red           = Color3.fromRGB(231, 76, 60),
+    Blue          = Color3.fromRGB(52, 152, 219),
+    Purple        = Color3.fromRGB(155, 89, 182),
+    Gold          = Color3.fromRGB(241, 196, 15),
+    Cyan          = Color3.fromRGB(26, 188, 156),
+}
+
+-- ===== FILE I/O =====
+local function loadKeys()
+    local keys = {}
+    if isfile and isfile(FILE_NAME) then
+        local content = readfile(FILE_NAME)
+        for line in content:gmatch("[^\r\n]+") do
+            if line ~= "" then table.insert(keys, line) end
+        end
+    end
+    return keys
+end
+
+local function saveKeysToFile(keys)
+    if writefile then
+        writefile(FILE_NAME, table.concat(keys, "\n"))
+    end
+end
+
+-- ===== GUI =====
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "KeySystemPro"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- ===== TIỆN ÍCH =====
+local function tween(obj, time, props, style, dir)
+    local info = TweenInfo.new(time or 0.3, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out)
+    TweenService:Create(obj, info, props):Play()
+end
+
+local function addCorner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 10)
+    c.Parent = parent
+    return c
+end
+
+local function addStroke(parent, color, thickness)
+    local s = Instance.new("UIStroke")
+    s.Color = color or COLORS.Border
+    s.Thickness = thickness or 1.5
+    s.Transparency = 0.3
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Parent = parent
+    return s
+end
+
+local function addGradient(parent, c1, c2, rotation)
+    local g = Instance.new("UIGradient")
+    g.Color = ColorSequence.new(c1, c2)
+    g.Rotation = rotation or 90
+    g.Parent = parent
+    return g
+end
+
+-- ===== NỀN =====
+local BgFrame = Instance.new("Frame")
+BgFrame.Size = UDim2.new(1, 0, 1, 0)
+BgFrame.BackgroundColor3 = COLORS.Background
+BgFrame.BackgroundTransparency = 0.35
+BgFrame.BorderSizePixel = 0
+BgFrame.ZIndex = 0
+BgFrame.Parent = ScreenGui
+addGradient(BgFrame, Color3.fromRGB(15, 15, 30), Color3.fromRGB(40, 20, 60), 45)
+
+-- ===== TOAST =====
+local ToastContainer = Instance.new("Frame")
+ToastContainer.Size = UDim2.new(0, 320, 1, 0)
+ToastContainer.Position = UDim2.new(1, -340, 0, 0)
+ToastContainer.BackgroundTransparency = 1
+ToastContainer.ZIndex = 100
+ToastContainer.Parent = ScreenGui
+
+local ToastLayout = Instance.new("UIListLayout")
+ToastLayout.Padding = UDim.new(0, 8)
+ToastLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+ToastLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ToastLayout.Parent = ToastContainer
+
+local function showToast(message, toastType)
+    toastType = toastType or "info"
+    local color, icon = COLORS.Blue, "ℹ"
+    if toastType == "success" then color, icon = COLORS.Green, "✔" end
+    if toastType == "error" then color, icon = COLORS.Red, "✖" end
+    if toastType == "warning" then color, icon = COLORS.Gold, "⚠" end
+
+    local toast = Instance.new("Frame")
+    toast.Size = UDim2.new(0, 320, 0, 50)
+    toast.Position = UDim2.new(1, 400, 0, 0)
+    toast.BackgroundColor3 = COLORS.Panel
+    toast.BorderSizePixel = 0
+    toast.ZIndex = 101
+    toast.Parent = ToastContainer
+    addCorner(toast, 10)
+    addStroke(toast, color, 1.5)
+
+    local accent = Instance.new("Frame")
+    accent.Size = UDim2.new(0, 5, 1, 0)
+    accent.BackgroundColor3 = color
+    accent.BorderSizePixel = 0
+    accent.Parent = toast
+    addCorner(accent, 10)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -20, 1, 0)
+    lbl.Position = UDim2.new(0, 15, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = icon .. "  " .. message
+    lbl.TextColor3 = COLORS.TextPrimary
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextScaled = true
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.Parent = toast
+
+    tween(toast, 0.4, {Position = UDim2.new(1, -340, 0, 0)}, Enum.EasingStyle.Back)
+    task.delay(2.5, function()
+        tween(toast, 0.3, {Position = UDim2.new(1, 400, 0, 0)})
+        task.wait(0.35)
+        toast:Destroy()
+    end)
+end
+
+-- ===== BẢNG CHÍNH =====
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 420, 0, 270)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -135)
+MainFrame.BackgroundColor3 = COLORS.Panel
+MainFrame.BorderSizePixel = 0
+MainFrame.ZIndex = 10
+MainFrame.Parent = ScreenGui
+addCorner(MainFrame, 16)
+addStroke(MainFrame, COLORS.Purple, 2)
+addGradient(MainFrame, COLORS.Panel, Color3.fromRGB(35, 25, 55), 120)
+
+local Glow = Instance.new("ImageLabel")
+Glow.Size = UDim2.new(1, 40, 1, 40)
+Glow.Position = UDim2.new(0, -20, 0, -20)
+Glow.BackgroundTransparency = 1
+Glow.Image = "rbxassetid://5028857084"
+Glow.ImageColor3 = COLORS.Purple
+Glow.ImageTransparency = 0.6
+Glow.ZIndex = 9
+Glow.Parent = MainFrame
+addCorner(Glow, 20)
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, -20, 0, 45)
+TitleBar.Position = UDim2.new(0, 10, 0, 10)
+TitleBar.BackgroundColor3 = COLORS.PanelLight
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+addCorner(TitleBar, 10)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 1, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "🔑  KEY SYSTEM"
+Title.TextColor3 = COLORS.TextPrimary
+Title.TextScaled = true
+Title.Font = Enum.Font.GothamBold
+Title.Parent = TitleBar
+
+local InputHolder = Instance.new("Frame")
+InputHolder.Size = UDim2.new(0.9, 0, 0, 48)
+InputHolder.Position = UDim2.new(0.05, 0, 0, 70)
+InputHolder.BackgroundColor3 = COLORS.Background
+InputHolder.BorderSizePixel = 0
+InputHolder.Parent = MainFrame
+addCorner(InputHolder, 10)
+local inputStroke = addStroke(InputHolder, COLORS.Border, 1.5)
+
+local KeyInput = Instance.new("TextBox")
+KeyInput.Size = UDim2.new(1, -20, 1, 0)
+KeyInput.Position = UDim2.new(0, 10, 0, 0)
+KeyInput.BackgroundTransparency = 1
+KeyInput.TextColor3 = COLORS.TextPrimary
+KeyInput.PlaceholderText = "Nhập key của bạn..."
+KeyInput.PlaceholderColor3 = COLORS.TextSecondary
+KeyInput.Text = ""
+KeyInput.TextScaled = true
+KeyInput.Font = Enum.Font.Gotham
+KeyInput.ClearTextOnFocus = false
+KeyInput.Parent = InputHolder
+
+KeyInput.Focused:Connect(function()
+    tween(inputStroke, 0.2, {Color = COLORS.Cyan, Transparency = 0})
+end)
+KeyInput.FocusLost:Connect(function()
+    tween(inputStroke, 0.2, {Color = COLORS.Border, Transparency = 0.3})
+end)
+
+-- ===== NÚT =====
+local function createStyledButton(name, text, pos, size, color1, color2, parent)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Size = size
+    btn.Position = pos
+    btn.BackgroundColor3 = color1
+    btn.Text = ""
+    btn.AutoButtonColor = false
+    btn.BorderSizePixel = 0
+    btn.Parent = parent
+    addCorner(btn, 8)
+    addGradient(btn, color1, color2, 90)
+
+    local stroke = addStroke(btn, Color3.fromRGB(255, 255, 255), 1)
+    stroke.Transparency = 0.75
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = COLORS.TextPrimary
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.Parent = btn
+
+    btn.MouseEnter:Connect(function()
+        tween(btn, 0.2, {Size = UDim2.new(size.X.Scale, size.X.Offset, size.Y.Scale, size.Y.Offset + 3)})
+        tween(stroke, 0.2, {Transparency = 0.3})
+    end)
+    btn.MouseLeave:Connect(function()
+        tween(btn, 0.2, {Size = size})
+        tween(stroke, 0.2, {Transparency = 0.75})
+    end)
+    btn.MouseButton1Down:Connect(function()
+        tween(btn, 0.08, {
+            Size = UDim2.new(size.X.Scale, size.X.Offset - 6, size.Y.Scale, size.Y.Offset - 4),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        })
+    end)
+    btn.MouseButton1Up:Connect(function()
+        tween(btn, 0.15, {Size = size, BackgroundColor3 = color1})
+    end)
+
+    return btn, label
+end
+
+local btnWidth = UDim2.new(0.42, 0, 0, 42)
+local ConfirmBtn = createStyledButton("ConfirmBtn", "✔  XÁC NHẬN",
+    UDim2.new(0.05, 0, 0, 135), btnWidth, COLORS.Green, Color3.fromRGB(30, 140, 80), MainFrame)
+local ClearBtn = createStyledButton("ClearBtn", "✖  XÓA",
+    UDim2.new(0.53, 0, 0, 135), btnWidth, COLORS.Red, Color3.fromRGB(160, 50, 40), MainFrame)
+local SaveBtn = createStyledButton("SaveBtn", "💾  LƯU KEY",
+    UDim2.new(0.05, 0, 0, 185), btnWidth, COLORS.Blue, Color3.fromRGB(30, 90, 160), MainFrame)
+local ToggleBtn = createStyledButton("ToggleBtn", "📂  DANH SÁCH",
+    UDim2.new(0.53, 0, 0, 185), btnWidth, COLORS.Purple, Color3.fromRGB(100, 50, 140), MainFrame)
+
+-- ===== BẢNG DANH SÁCH =====
+local KeyListFrame = Instance.new("Frame")
+KeyListFrame.Size = UDim2.new(0, 420, 0, 380)
+KeyListFrame.Position = UDim2.new(0.5, -210, 0.5, -190)
+KeyListFrame.BackgroundColor3 = COLORS.Panel
+KeyListFrame.BorderSizePixel = 0
+KeyListFrame.Visible = false
+KeyListFrame.ZIndex = 10
+KeyListFrame.Parent = ScreenGui
+addCorner(KeyListFrame, 16)
+addStroke(KeyListFrame, COLORS.Cyan, 2)
+addGradient(KeyListFrame, COLORS.Panel, Color3.fromRGB(25, 40, 50), 120)
+
+local ListTitleBar = Instance.new("Frame")
+ListTitleBar.Size = UDim2.new(1, -20, 0, 45)
+ListTitleBar.Position = UDim2.new(0, 10, 0, 10)
+ListTitleBar.BackgroundColor3 = COLORS.PanelLight
+ListTitleBar.BorderSizePixel = 0
+ListTitleBar.Parent = KeyListFrame
+addCorner(ListTitleBar, 10)
+
+local ListTitle = Instance.new("TextLabel")
+ListTitle.Size = UDim2.new(1, -50, 1, 0)
+ListTitle.Position = UDim2.new(0, 10, 0, 0)
+ListTitle.BackgroundTransparency = 1
+ListTitle.Text = "📋  DANH SÁCH KEY"
+ListTitle.TextColor3 = COLORS.TextPrimary
+ListTitle.TextXAlignment = Enum.TextXAlignment.Left
+ListTitle.TextScaled = true
+ListTitle.Font = Enum.Font.GothamBold
+ListTitle.Parent = ListTitleBar
+
+local CloseListBtn = Instance.new("TextButton")
+CloseListBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseListBtn.Position = UDim2.new(1, -38, 0.5, -15)
+CloseListBtn.BackgroundColor3 = COLORS.Red
+CloseListBtn.Text = "✕"
+CloseListBtn.TextColor3 = COLORS.TextPrimary
+CloseListBtn.TextScaled = true
+CloseListBtn.Font = Enum.Font.GothamBold
+CloseListBtn.AutoButtonColor = false
+CloseListBtn.Parent = ListTitleBar
+addCorner(CloseListBtn, 15)
+
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(0.95, 0, 0.85, 0)
+ScrollFrame.Position = UDim2.new(0.025, 0, 0.13, 0)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.ScrollBarThickness = 6
+ScrollFrame.ScrollBarImageColor3 = COLORS.Cyan
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollFrame.Parent = KeyListFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Parent = ScrollFrame
+
+-- ===== REFRESH LIST =====
+local savedKeys = loadKeys()
+local keyButtons = {}
+
+local function refreshKeyList()
+    for _, b in ipairs(keyButtons) do b:Destroy() end
+    keyButtons = {}
+
+    for i, keyName in ipairs(savedKeys) do
+        local keyBtn = Instance.new("TextButton")
+        keyBtn.Size = UDim2.new(1, -20, 0, 48)
+        keyBtn.BackgroundColor3 = COLORS.Blue
+        keyBtn.Text = ""
+        keyBtn.AutoButtonColor = false
+        keyBtn.BorderSizePixel = 0
+        keyBtn.LayoutOrder = i
+        keyBtn.Parent = ScrollFrame
+        addCorner(keyBtn, 8)
+        addGradient(keyBtn, COLORS.Blue, COLORS.Cyan, 0)
+        local kStroke = addStroke(keyBtn, COLORS.Cyan, 1)
+        kStroke.Transparency = 0.7
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -20, 1, 0)
+        lbl.Position = UDim2.new(0, 12, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = "🔑  " .. keyName
+        lbl.TextColor3 = COLORS.TextPrimary
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextScaled = true
+        lbl.Font = Enum.Font.GothamMedium
+        lbl.Parent = keyBtn
+
+        keyBtn.MouseButton1Click:Connect(function()
+            KeyInput.Text = keyName
+            KeyListFrame.Visible = false
+            MainFrame.Visible = true
+        end)
+        keyBtn.MouseButton2Click:Connect(function()
+            for idx, k in ipairs(savedKeys) do
+                if k == keyName then table.remove(savedKeys, idx); break end
+            end
+            saveKeysToFile(savedKeys)
+            refreshKeyList()
+            showToast("Đã xóa: " .. keyName, "warning")
+        end)
+
+        table.insert(keyButtons, keyBtn)
+    end
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, #savedKeys * 56)
+end
+
+refreshKeyList()
+
+-- ===== HÀM CHECK KEY ONLINE =====
+local function checkKeyOnline(inputKey)
+    local ok, result = pcall(function()
+        return game:HttpGet(KEY_URL)
+    end)
+    if ok then
+        return inputKey == result:gsub("%s+", "")
+    end
+    return false
+end
+
+-- ===== ĐÓNG MENU + LOAD SCRIPT =====
+local function closeAndLoad()
+    -- Animation đóng
+    tween(MainFrame, 0.3, {
+        Size = UDim2.new(0, 420, 0, 0),
+        Position = UDim2.new(0.5, -210, 0.5, 0)
+    }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    task.wait(0.3)
+
+    -- Ẩn toàn bộ GUI (chỉ ẩn, không xóa để dùng lại)
+    ScreenGui.Enabled = false
+
+    -- Load script từ URL
+    task.spawn(function()
+        local ok, err = pcall(function()
+            loadstring(game:HttpGet(SCRIPT_URL))()
+        end)
+        if not ok then
+            showToast("Lỗi load script: " .. tostring(err), "error")
+            ScreenGui.Enabled = true -- bật lại nếu lỗi
+            MainFrame.Visible = true
+            MainFrame.Size = UDim2.new(0, 420, 0, 270)
+            MainFrame.Position = UDim2.new(0.5, -210, 0.5, -135)
+        end
+    end)
+end
+
+-- ===== SỰ KIỆN =====
+
+-- XÁC NHẬN → check key → load script → đóng menu
+ConfirmBtn.MouseButton1Click:Connect(function()
+    local key = KeyInput.Text
+    if key == "" then
+        showToast("Vui lòng nhập key!", "error")
+        return
+    end
+    showToast("Đang kiểm tra key...", "info")
+    task.spawn(function()
+        if checkKeyOnline(key) then
+            showToast("✔ Key hợp lệ! Đang tải script...", "success")
+            task.wait(0.8)
+            closeAndLoad()
+        else
+            showToast("✖ Key không hợp lệ!", "error")
+        end
+    end)
+end)
+
+-- XÓA
+ClearBtn.MouseButton1Click:Connect(function()
+    KeyInput.Text = ""
+    showToast("Đã xóa ô nhập", "info")
+end)
+
+-- LƯU
+SaveBtn.MouseButton1Click:Connect(function()
+    local key = KeyInput.Text
+    if key == "" then
+        showToast("Không có key để lưu!", "error")
+        return
+    end
+    for _, k in ipairs(savedKeys) do
+        if k == key then
+            showToast("Key đã tồn tại!", "warning")
+            return
+        end
+    end
+    table.insert(savedKeys, key)
+    saveKeysToFile(savedKeys)
+    refreshKeyList()
+    showToast("💾 Đã lưu: " .. key, "success")
+end)
+
+-- TOGGLE DANH SÁCH
+ToggleBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+    KeyListFrame.Visible = not KeyListFrame.Visible
+    if KeyListFrame.Visible then refreshKeyList() end
+end)
+
+CloseListBtn.MouseButton1Click:Connect(function()
+    KeyListFrame.Visible = false
+    MainFrame.Visible = true
+end)
+
+-- ===== HIỆU ỨNG XUẤT HIỆN BAN ĐẦU =====
+MainFrame.Size = UDim2.new(0, 420, 0, 0)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, 0)
+task.wait(0.2)
+tween(MainFrame, 0.5, {
+    Size = UDim2.new(0, 420, 0, 270),
+    Position = UDim2.new(0.5, -210, 0.5, -135)
+}, Enum.EasingStyle.Back)
+
+-- Glow pulse
+task.spawn(function()
+    while MainFrame.Parent do
+        tween(Glow, 1.5, {ImageTransparency = 0.75}, Enum.EasingStyle.Sine)
+        tween(Glow, 1.5, {ImageTransparency = 0.55}, Enum.EasingStyle.Sine)
+        task.wait(3)
+    end
+end)
+
+showToast("Key System đã sẵn sàng!", "success")
