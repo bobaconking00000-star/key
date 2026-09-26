@@ -1,13 +1,68 @@
 -- ==========================================
--- 🔑 KEY SYSTEM + AUTO LOAD SCRIPT
+-- 🔑 KEY SYSTEM + AUTO LOAD + ANTI-KICK
 -- Delta Executor
 -- ==========================================
 
 local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 
--- ===== CẤU HÌNH =====
-local FILE_NAME = "saved_keys.txt"
-local KEY_URL = "https://raw.githubusercontent.com/bobaconking00000-star/key/refs/heads/main/hlodwhite"
+-- ==========================================
+-- 🛡️ ANTI-KICK SYSTEM
+-- ==========================================
+local AntiKick = { Enabled = true }
+
+-- 1. Hook __namecall để chặn Kick
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+mt.__namecall = newcclosure(function(self, ...)
+    if getnamecallmethod() == "Kick" then
+        return nil
+    end
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
+
+-- 2. Chặn Shutdown
+pcall(function()
+    local oldShutdown = game.Shutdown
+    hookfunction(oldShutdown, function(self, ...) return nil end)
+end)
+
+-- 3. Loop bảo vệ Parent của Player
+task.spawn(function()
+    while AntiKick.Enabled do
+        pcall(function()
+            if LocalPlayer.Parent ~= Players then
+                LocalPlayer.Parent = Players
+            end
+        end)
+        task.wait(0.5)
+    end
+end)
+
+-- 4. Bảo vệ Character
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char.AncestryChanged:Connect(function(_, parent)
+        if not parent and AntiKick.Enabled then
+            pcall(function()
+                LocalPlayer.Character = char
+                char.Parent = workspace
+            end)
+        end
+    end)
+end)
+
+print("[Anti-Kick] Đã kích hoạt 🛡️")
+
+-- ==========================================
+-- CẤU HÌNH
+-- ==========================================
+local FILE_NAME  = "saved_keys.txt"
+local KEY_URL    = "https://raw.githubusercontent.com/bobaconking00000-star/key/refs/heads/main/hlodwhite"
 local SCRIPT_URL = "https://raw.githubusercontent.com/tienkhanh1/spicy/main/Chilli.lua"
 
 -- ===== MÀU SẮC =====
@@ -30,8 +85,7 @@ local COLORS = {
 local function loadKeys()
     local keys = {}
     if isfile and isfile(FILE_NAME) then
-        local content = readfile(FILE_NAME)
-        for line in content:gmatch("[^\r\n]+") do
+        for line in readfile(FILE_NAME):gmatch("[^\r\n]+") do
             if line ~= "" then table.insert(keys, line) end
         end
     end
@@ -39,9 +93,7 @@ local function loadKeys()
 end
 
 local function saveKeysToFile(keys)
-    if writefile then
-        writefile(FILE_NAME, table.concat(keys, "\n"))
-    end
+    if writefile then writefile(FILE_NAME, table.concat(keys, "\n")) end
 end
 
 -- ===== GUI =====
@@ -50,7 +102,7 @@ ScreenGui.Name = "KeySystemPro"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ===== TIỆN ÍCH =====
 local function tween(obj, time, props, style, dir)
@@ -58,11 +110,8 @@ local function tween(obj, time, props, style, dir)
     TweenService:Create(obj, info, props):Play()
 end
 
-local function addCorner(parent, radius)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, radius or 10)
-    c.Parent = parent
-    return c
+local function addCorner(parent, r)
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, r or 10); c.Parent = parent; return c
 end
 
 local function addStroke(parent, color, thickness)
@@ -75,10 +124,10 @@ local function addStroke(parent, color, thickness)
     return s
 end
 
-local function addGradient(parent, c1, c2, rotation)
+local function addGradient(parent, c1, c2, rot)
     local g = Instance.new("UIGradient")
     g.Color = ColorSequence.new(c1, c2)
-    g.Rotation = rotation or 90
+    g.Rotation = rot or 90
     g.Parent = parent
     return g
 end
@@ -111,7 +160,7 @@ local function showToast(message, toastType)
     toastType = toastType or "info"
     local color, icon = COLORS.Blue, "ℹ"
     if toastType == "success" then color, icon = COLORS.Green, "✔" end
-    if toastType == "error" then color, icon = COLORS.Red, "✖" end
+    if toastType == "error"   then color, icon = COLORS.Red, "✖" end
     if toastType == "warning" then color, icon = COLORS.Gold, "⚠" end
 
     local toast = Instance.new("Frame")
@@ -145,14 +194,12 @@ local function showToast(message, toastType)
     tween(toast, 0.4, {Position = UDim2.new(1, -340, 0, 0)}, Enum.EasingStyle.Back)
     task.delay(2.5, function()
         tween(toast, 0.3, {Position = UDim2.new(1, 400, 0, 0)})
-        task.wait(0.35)
-        toast:Destroy()
+        task.wait(0.35); toast:Destroy()
     end)
 end
 
 -- ===== BẢNG CHÍNH =====
 local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 420, 0, 270)
 MainFrame.Position = UDim2.new(0.5, -210, 0.5, -135)
 MainFrame.BackgroundColor3 = COLORS.Panel
@@ -174,6 +221,7 @@ Glow.ZIndex = 9
 Glow.Parent = MainFrame
 addCorner(Glow, 20)
 
+-- Tiêu đề
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, -20, 0, 45)
 TitleBar.Position = UDim2.new(0, 10, 0, 10)
@@ -183,14 +231,37 @@ TitleBar.Parent = MainFrame
 addCorner(TitleBar, 10)
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 1, 0)
+Title.Size = UDim2.new(1, -50, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Text = "🔑  KEY SYSTEM"
 Title.TextColor3 = COLORS.TextPrimary
+Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.TextScaled = true
 Title.Font = Enum.Font.GothamBold
 Title.Parent = TitleBar
 
+-- 🆕 NÚT TẮT BẢNG (X)
+local CloseMainBtn = Instance.new("TextButton")
+CloseMainBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseMainBtn.Position = UDim2.new(1, -38, 0.5, -15)
+CloseMainBtn.BackgroundColor3 = COLORS.Red
+CloseMainBtn.Text = "✕"
+CloseMainBtn.TextColor3 = COLORS.TextPrimary
+CloseMainBtn.TextScaled = true
+CloseMainBtn.Font = Enum.Font.GothamBold
+CloseMainBtn.AutoButtonColor = false
+CloseMainBtn.Parent = TitleBar
+addCorner(CloseMainBtn, 15)
+
+CloseMainBtn.MouseEnter:Connect(function()
+    tween(CloseMainBtn, 0.15, {BackgroundColor3 = Color3.fromRGB(255, 90, 80)})
+end)
+CloseMainBtn.MouseLeave:Connect(function()
+    tween(CloseMainBtn, 0.15, {BackgroundColor3 = COLORS.Red})
+end)
+
+-- Ô nhập key
 local InputHolder = Instance.new("Frame")
 InputHolder.Size = UDim2.new(0.9, 0, 0, 48)
 InputHolder.Position = UDim2.new(0.05, 0, 0, 70)
@@ -210,7 +281,6 @@ KeyInput.PlaceholderColor3 = COLORS.TextSecondary
 KeyInput.Text = ""
 KeyInput.TextScaled = true
 KeyInput.Font = Enum.Font.Gotham
-KeyInput.ClearTextOnFocus = false
 KeyInput.Parent = InputHolder
 
 KeyInput.Focused:Connect(function()
@@ -220,21 +290,20 @@ KeyInput.FocusLost:Connect(function()
     tween(inputStroke, 0.2, {Color = COLORS.Border, Transparency = 0.3})
 end)
 
--- ===== NÚT =====
-local function createStyledButton(name, text, pos, size, color1, color2, parent)
+-- ===== HÀM TẠO NÚT =====
+local function createStyledButton(name, text, pos, size, c1, c2, parent)
     local btn = Instance.new("TextButton")
     btn.Name = name
     btn.Size = size
     btn.Position = pos
-    btn.BackgroundColor3 = color1
+    btn.BackgroundColor3 = c1
     btn.Text = ""
     btn.AutoButtonColor = false
     btn.BorderSizePixel = 0
     btn.Parent = parent
     addCorner(btn, 8)
-    addGradient(btn, color1, color2, 90)
-
-    local stroke = addStroke(btn, Color3.fromRGB(255, 255, 255), 1)
+    addGradient(btn, c1, c2, 90)
+    local stroke = addStroke(btn, Color3.fromRGB(255,255,255), 1)
     stroke.Transparency = 0.75
 
     local label = Instance.new("TextLabel")
@@ -257,25 +326,29 @@ local function createStyledButton(name, text, pos, size, color1, color2, parent)
     btn.MouseButton1Down:Connect(function()
         tween(btn, 0.08, {
             Size = UDim2.new(size.X.Scale, size.X.Offset - 6, size.Y.Scale, size.Y.Offset - 4),
-            BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            BackgroundColor3 = Color3.fromRGB(255,255,255)
         })
     end)
     btn.MouseButton1Up:Connect(function()
-        tween(btn, 0.15, {Size = size, BackgroundColor3 = color1})
+        tween(btn, 0.15, {Size = size, BackgroundColor3 = c1})
     end)
-
     return btn, label
 end
 
-local btnWidth = UDim2.new(0.42, 0, 0, 42)
+-- Layout nút mới (chỉ còn 3 nút, dàn đều)
+-- Hàng 1: XÁC NHẬN (full width)
 local ConfirmBtn = createStyledButton("ConfirmBtn", "✔  XÁC NHẬN",
-    UDim2.new(0.05, 0, 0, 135), btnWidth, COLORS.Green, Color3.fromRGB(30, 140, 80), MainFrame)
-local ClearBtn = createStyledButton("ClearBtn", "✖  XÓA",
-    UDim2.new(0.53, 0, 0, 135), btnWidth, COLORS.Red, Color3.fromRGB(160, 50, 40), MainFrame)
+    UDim2.new(0.05, 0, 0, 135), UDim2.new(0.9, 0, 0, 42),
+    COLORS.Green, Color3.fromRGB(30, 140, 80), MainFrame)
+
+-- Hàng 2: LƯU KEY (trái) + DANH SÁCH (phải)
+local btnWidth = UDim2.new(0.42, 0, 0, 42)
 local SaveBtn = createStyledButton("SaveBtn", "💾  LƯU KEY",
-    UDim2.new(0.05, 0, 0, 185), btnWidth, COLORS.Blue, Color3.fromRGB(30, 90, 160), MainFrame)
+    UDim2.new(0.05, 0, 0, 185), btnWidth,
+    COLORS.Blue, Color3.fromRGB(30, 90, 160), MainFrame)
 local ToggleBtn = createStyledButton("ToggleBtn", "📂  DANH SÁCH",
-    UDim2.new(0.53, 0, 0, 185), btnWidth, COLORS.Purple, Color3.fromRGB(100, 50, 140), MainFrame)
+    UDim2.new(0.53, 0, 0, 185), btnWidth,
+    COLORS.Purple, Color3.fromRGB(100, 50, 140), MainFrame)
 
 -- ===== BẢNG DANH SÁCH =====
 local KeyListFrame = Instance.new("Frame")
@@ -387,40 +460,34 @@ local function refreshKeyList()
     end
     ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, #savedKeys * 56)
 end
-
 refreshKeyList()
 
--- ===== HÀM CHECK KEY ONLINE =====
+-- ===== CHECK KEY ONLINE =====
 local function checkKeyOnline(inputKey)
     local ok, result = pcall(function()
         return game:HttpGet(KEY_URL)
     end)
-    if ok then
-        return inputKey == result:gsub("%s+", "")
-    end
+    if ok then return inputKey == result:gsub("%s+", "") end
     return false
 end
 
 -- ===== ĐÓNG MENU + LOAD SCRIPT =====
 local function closeAndLoad()
-    -- Animation đóng
     tween(MainFrame, 0.3, {
         Size = UDim2.new(0, 420, 0, 0),
         Position = UDim2.new(0.5, -210, 0.5, 0)
     }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
     task.wait(0.3)
 
-    -- Ẩn toàn bộ GUI (chỉ ẩn, không xóa để dùng lại)
     ScreenGui.Enabled = false
 
-    -- Load script từ URL
     task.spawn(function()
         local ok, err = pcall(function()
             loadstring(game:HttpGet(SCRIPT_URL))()
         end)
         if not ok then
             showToast("Lỗi load script: " .. tostring(err), "error")
-            ScreenGui.Enabled = true -- bật lại nếu lỗi
+            ScreenGui.Enabled = true
             MainFrame.Visible = true
             MainFrame.Size = UDim2.new(0, 420, 0, 270)
             MainFrame.Position = UDim2.new(0.5, -210, 0.5, -135)
@@ -430,7 +497,7 @@ end
 
 -- ===== SỰ KIỆN =====
 
--- XÁC NHẬN → check key → load script → đóng menu
+-- XÁC NHẬN
 ConfirmBtn.MouseButton1Click:Connect(function()
     local key = KeyInput.Text
     if key == "" then
@@ -447,12 +514,6 @@ ConfirmBtn.MouseButton1Click:Connect(function()
             showToast("✖ Key không hợp lệ!", "error")
         end
     end)
-end)
-
--- XÓA
-ClearBtn.MouseButton1Click:Connect(function()
-    KeyInput.Text = ""
-    showToast("Đã xóa ô nhập", "info")
 end)
 
 -- LƯU
@@ -481,12 +542,43 @@ ToggleBtn.MouseButton1Click:Connect(function()
     if KeyListFrame.Visible then refreshKeyList() end
 end)
 
+-- ĐÓNG BẢNG DANH SÁCH
 CloseListBtn.MouseButton1Click:Connect(function()
     KeyListFrame.Visible = false
     MainFrame.Visible = true
 end)
 
--- ===== HIỆU ỨNG XUẤT HIỆN BAN ĐẦU =====
+-- 🆕 ĐÓNG BẢNG NHẬP KEY (ẩn toàn bộ GUI)
+CloseMainBtn.MouseButton1Click:Connect(function()
+    tween(MainFrame, 0.25, {
+        Size = UDim2.new(0, 420, 0, 0),
+        Position = UDim2.new(0.5, -210, 0.5, 0)
+    }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    task.wait(0.25)
+    ScreenGui.Enabled = false
+    showToast("Đã ẩn menu (bấm K để mở lại)", "info")
+end)
+
+-- ===== Bấm K để mở lại menu =====
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.K then
+        ScreenGui.Enabled = not ScreenGui.Enabled
+        if ScreenGui.Enabled then
+            MainFrame.Visible = true
+            KeyListFrame.Visible = false
+            -- Animation bung ra
+            MainFrame.Size = UDim2.new(0, 420, 0, 0)
+            MainFrame.Position = UDim2.new(0.5, -210, 0.5, 0)
+            tween(MainFrame, 0.35, {
+                Size = UDim2.new(0, 420, 0, 270),
+                Position = UDim2.new(0.5, -210, 0.5, -135)
+            }, Enum.EasingStyle.Back)
+        end
+    end
+end)
+
+-- ===== HIỆU ỨNG XUẤT HIỆN =====
 MainFrame.Size = UDim2.new(0, 420, 0, 0)
 MainFrame.Position = UDim2.new(0.5, -210, 0.5, 0)
 task.wait(0.2)
@@ -504,4 +596,4 @@ task.spawn(function()
     end
 end)
 
-showToast("Key System đã sẵn sàng!", "success")
+showToast("Key System + Anti-Kick đã sẵn sàng!", "success")
