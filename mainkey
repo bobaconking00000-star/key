@@ -1,62 +1,103 @@
 -- ==========================================
--- 🔑 KEY SYSTEM + AUTO LOAD + ANTI-KICK
--- Delta Executor
+-- 🔑 KEY SYSTEM + ANTI-KICK MAX + AUTO LOAD
+-- Gộp từ VuHub + Chilli + Key System
 -- ==========================================
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
 -- ==========================================
--- 🛡️ ANTI-KICK SYSTEM
+-- 🛡️ ANTI-KICK MAX (7 LỚP) - TỪ VUHUB
 -- ==========================================
-local AntiKick = { Enabled = true }
-
--- 1. Hook __namecall để chặn Kick
+getgenv().AntiKickMax = true
 local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-setreadonly(mt, false)
-mt.__namecall = newcclosure(function(self, ...)
-    if getnamecallmethod() == "Kick" then
-        return nil
-    end
-    return oldNamecall(self, ...)
-end)
-setreadonly(mt, true)
 
--- 2. Chặn Shutdown
-pcall(function()
-    local oldShutdown = game.Shutdown
-    hookfunction(oldShutdown, function(self, ...) return nil end)
-end)
+local function showKickBlocked()
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "🛡️",
+            Text = "Kick blocked",
+            Duration = 2,
+        })
+    end)
+end
 
--- 3. Loop bảo vệ Parent của Player
-task.spawn(function()
-    while AntiKick.Enabled do
+if not getgenv().AntiKickLoaded then
+    getgenv().AntiKickLoaded = true
+
+    setreadonly(mt, false)
+    local old_namecall = mt.__namecall
+
+    -- LỚP 1: Hook __namecall chặn Kick/Ban/Detected
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+
+        if self == LocalPlayer and (method == "Kick" or method:lower():find("kick") or method:lower():find("ban") or method:lower():find("detected")) then
+            showKickBlocked()
+            return
+        end
+
+        if method == "FireServer" and (tostring(self):find("Kick") or tostring(self):find("Ban") or tostring(self):find("exploit") or tostring(self):find("detected")) then
+            showKickBlocked()
+            return
+        end
+
+        if method == "Disconnect" and self == LocalPlayer then
+            showKickBlocked()
+            return
+        end
+
+        return old_namecall(self, ...)
+    end)
+
+    -- LỚP 2: Hook trực tiếp hàm Kick
+    if hookfunction then
         pcall(function()
-            if LocalPlayer.Parent ~= Players then
-                LocalPlayer.Parent = Players
-            end
+            hookfunction(LocalPlayer.Kick, function() showKickBlocked() end)
         end)
-        task.wait(0.5)
     end
-end)
 
--- 4. Bảo vệ Character
-LocalPlayer.CharacterAdded:Connect(function(char)
-    char.AncestryChanged:Connect(function(_, parent)
-        if not parent and AntiKick.Enabled then
+    -- LỚP 3: Ghi đè hàm error()
+    local old_error = error
+    error = function(msg, level)
+        local s = tostring(msg):lower()
+        if s:find("kick") or s:find("exploit") or s:find("ban") or s:find("detected") or #tostring(msg) > 1000 then
+            showKickBlocked()
+            return
+        end
+        return old_error(msg, level)
+    end
+
+    -- LỚP 4-7: Re-hook loop + Disable Idled
+    task.spawn(function()
+        while task.wait(0.15) do
             pcall(function()
-                LocalPlayer.Character = char
-                char.Parent = workspace
+                for _, c in ipairs(getconnections(LocalPlayer.Idled)) do
+                    c:Disable()
+                end
+            end)
+
+            pcall(function()
+                setreadonly(mt, false)
+                mt.__namecall = newcclosure(function(self, ...)
+                    local method = getnamecallmethod()
+                    if self == LocalPlayer and (method:lower():find("kick") or method:lower():find("detected")) then
+                        showKickBlocked()
+                        return
+                    end
+                    return old_namecall(self, ...)
+                end)
+                setreadonly(mt, true)
             end)
         end
     end)
-end)
 
-print("[Anti-Kick] Đã kích hoạt 🛡️")
+    setreadonly(mt, true)
+    print("✅ Anti-Kick MAX đã kích hoạt - 7 lớp!")
+end
 
 -- ==========================================
 -- CẤU HÌNH
@@ -221,7 +262,6 @@ Glow.ZIndex = 9
 Glow.Parent = MainFrame
 addCorner(Glow, 20)
 
--- Tiêu đề
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, -20, 0, 45)
 TitleBar.Position = UDim2.new(0, 10, 0, 10)
@@ -241,7 +281,7 @@ Title.TextScaled = true
 Title.Font = Enum.Font.GothamBold
 Title.Parent = TitleBar
 
--- 🆕 NÚT TẮT BẢNG (X)
+-- Nút tắt bảng
 local CloseMainBtn = Instance.new("TextButton")
 CloseMainBtn.Size = UDim2.new(0, 30, 0, 30)
 CloseMainBtn.Position = UDim2.new(1, -38, 0.5, -15)
@@ -261,7 +301,7 @@ CloseMainBtn.MouseLeave:Connect(function()
     tween(CloseMainBtn, 0.15, {BackgroundColor3 = COLORS.Red})
 end)
 
--- Ô nhập key
+-- Ô nhập
 local InputHolder = Instance.new("Frame")
 InputHolder.Size = UDim2.new(0.9, 0, 0, 48)
 InputHolder.Position = UDim2.new(0.05, 0, 0, 70)
@@ -290,7 +330,7 @@ KeyInput.FocusLost:Connect(function()
     tween(inputStroke, 0.2, {Color = COLORS.Border, Transparency = 0.3})
 end)
 
--- ===== HÀM TẠO NÚT =====
+-- ===== NÚT =====
 local function createStyledButton(name, text, pos, size, c1, c2, parent)
     local btn = Instance.new("TextButton")
     btn.Name = name
@@ -335,13 +375,10 @@ local function createStyledButton(name, text, pos, size, c1, c2, parent)
     return btn, label
 end
 
--- Layout nút mới (chỉ còn 3 nút, dàn đều)
--- Hàng 1: XÁC NHẬN (full width)
 local ConfirmBtn = createStyledButton("ConfirmBtn", "✔  XÁC NHẬN",
     UDim2.new(0.05, 0, 0, 135), UDim2.new(0.9, 0, 0, 42),
     COLORS.Green, Color3.fromRGB(30, 140, 80), MainFrame)
 
--- Hàng 2: LƯU KEY (trái) + DANH SÁCH (phải)
 local btnWidth = UDim2.new(0.42, 0, 0, 42)
 local SaveBtn = createStyledButton("SaveBtn", "💾  LƯU KEY",
     UDim2.new(0.05, 0, 0, 185), btnWidth,
@@ -409,7 +446,6 @@ UIListLayout.Padding = UDim.new(0, 8)
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Parent = ScrollFrame
 
--- ===== REFRESH LIST =====
 local savedKeys = loadKeys()
 local keyButtons = {}
 
@@ -462,7 +498,7 @@ local function refreshKeyList()
 end
 refreshKeyList()
 
--- ===== CHECK KEY ONLINE =====
+-- ===== CHECK KEY =====
 local function checkKeyOnline(inputKey)
     local ok, result = pcall(function()
         return game:HttpGet(KEY_URL)
@@ -471,7 +507,23 @@ local function checkKeyOnline(inputKey)
     return false
 end
 
--- ===== ĐÓNG MENU + LOAD SCRIPT =====
+-- ===== LOAD CHILLI (STEALTH + RETRY) =====
+local function loadChilli()
+    for attempt = 1, 3 do
+        local ok, source = pcall(game.HttpGet, game, SCRIPT_URL)
+        if ok and type(source) == "string" and source ~= "" then
+            local chunk = loadstring(source)
+            if chunk then
+                pcall(chunk)
+            end
+            return true
+        end
+        task.wait(0.5)
+    end
+    return false
+end
+
+-- ===== ĐÓNG MENU + LOAD =====
 local function closeAndLoad()
     tween(MainFrame, 0.3, {
         Size = UDim2.new(0, 420, 0, 0),
@@ -482,11 +534,9 @@ local function closeAndLoad()
     ScreenGui.Enabled = false
 
     task.spawn(function()
-        local ok, err = pcall(function()
-            loadstring(game:HttpGet(SCRIPT_URL))()
-        end)
+        local ok, err = pcall(loadChilli)
         if not ok then
-            showToast("Lỗi load script: " .. tostring(err), "error")
+            showToast("Lỗi load: " .. tostring(err), "error")
             ScreenGui.Enabled = true
             MainFrame.Visible = true
             MainFrame.Size = UDim2.new(0, 420, 0, 270)
@@ -496,18 +546,13 @@ local function closeAndLoad()
 end
 
 -- ===== SỰ KIỆN =====
-
--- XÁC NHẬN
 ConfirmBtn.MouseButton1Click:Connect(function()
     local key = KeyInput.Text
-    if key == "" then
-        showToast("Vui lòng nhập key!", "error")
-        return
-    end
+    if key == "" then showToast("Vui lòng nhập key!", "error"); return end
     showToast("Đang kiểm tra key...", "info")
     task.spawn(function()
         if checkKeyOnline(key) then
-            showToast("✔ Key hợp lệ! Đang tải script...", "success")
+            showToast("✔ Key hợp lệ! Đang tải...", "success")
             task.wait(0.8)
             closeAndLoad()
         else
@@ -516,18 +561,11 @@ ConfirmBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- LƯU
 SaveBtn.MouseButton1Click:Connect(function()
     local key = KeyInput.Text
-    if key == "" then
-        showToast("Không có key để lưu!", "error")
-        return
-    end
+    if key == "" then showToast("Không có key!", "error"); return end
     for _, k in ipairs(savedKeys) do
-        if k == key then
-            showToast("Key đã tồn tại!", "warning")
-            return
-        end
+        if k == key then showToast("Key đã tồn tại!", "warning"); return end
     end
     table.insert(savedKeys, key)
     saveKeysToFile(savedKeys)
@@ -535,20 +573,17 @@ SaveBtn.MouseButton1Click:Connect(function()
     showToast("💾 Đã lưu: " .. key, "success")
 end)
 
--- TOGGLE DANH SÁCH
 ToggleBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
     KeyListFrame.Visible = not KeyListFrame.Visible
     if KeyListFrame.Visible then refreshKeyList() end
 end)
 
--- ĐÓNG BẢNG DANH SÁCH
 CloseListBtn.MouseButton1Click:Connect(function()
     KeyListFrame.Visible = false
     MainFrame.Visible = true
 end)
 
--- 🆕 ĐÓNG BẢNG NHẬP KEY (ẩn toàn bộ GUI)
 CloseMainBtn.MouseButton1Click:Connect(function()
     tween(MainFrame, 0.25, {
         Size = UDim2.new(0, 420, 0, 0),
@@ -559,7 +594,7 @@ CloseMainBtn.MouseButton1Click:Connect(function()
     showToast("Đã ẩn menu (bấm K để mở lại)", "info")
 end)
 
--- ===== Bấm K để mở lại menu =====
+-- Bấm K mở lại
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.K then
@@ -567,18 +602,11 @@ UserInputService.InputBegan:Connect(function(input, gpe)
         if ScreenGui.Enabled then
             MainFrame.Visible = true
             KeyListFrame.Visible = false
-            -- Animation bung ra
-            MainFrame.Size = UDim2.new(0, 420, 0, 0)
-            MainFrame.Position = UDim2.new(0.5, -210, 0.5, 0)
-            tween(MainFrame, 0.35, {
-                Size = UDim2.new(0, 420, 0, 270),
-                Position = UDim2.new(0.5, -210, 0.5, -135)
-            }, Enum.EasingStyle.Back)
         end
     end
 end)
 
--- ===== HIỆU ỨNG XUẤT HIỆN =====
+-- Entrance animation
 MainFrame.Size = UDim2.new(0, 420, 0, 0)
 MainFrame.Position = UDim2.new(0.5, -210, 0.5, 0)
 task.wait(0.2)
@@ -587,7 +615,6 @@ tween(MainFrame, 0.5, {
     Position = UDim2.new(0.5, -210, 0.5, -135)
 }, Enum.EasingStyle.Back)
 
--- Glow pulse
 task.spawn(function()
     while MainFrame.Parent do
         tween(Glow, 1.5, {ImageTransparency = 0.75}, Enum.EasingStyle.Sine)
@@ -596,4 +623,4 @@ task.spawn(function()
     end
 end)
 
-showToast("Key System + Anti-Kick đã sẵn sàng!", "success")
+showToast("Key System + Anti-Kick MAX đã sẵn sàng!", "success")
